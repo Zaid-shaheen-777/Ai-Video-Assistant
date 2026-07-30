@@ -1,0 +1,37 @@
+# Secrets — never commit these
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# App data / media
+downloads/
+vector_db/
+*.wav
+*.mp3
+*.mp4
+*.m4a
+*.mov
+*.webm
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Tests / local junk
+tests/*.wav
+*.log
