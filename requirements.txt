@@ -1,14 +1,10 @@
-# Streamlit Cloud / pip install -r requirements.txt
-# Prefer CPU PyTorch wheels (smaller / Cloud-friendly)
---extra-index-url https://download.pytorch.org/whl/cpu
+# Streamlit Community Cloud — keep this light (no torch / Whisper).
+# Local Whisper is optional; see requirements-local.txt
 
 yt-dlp>=2024.4.9
 pydub>=0.25.1
-audioop-lts>=0.2.1            # audioop was removed in Python 3.13+; pydub needs this
+audioop-lts>=0.2.1; python_version >= "3.13"
 ffmpeg-python>=0.2.0
-
-openai-whisper>=20231117
-torch
 
 deep-translator>=1.11.4
 
@@ -21,9 +17,6 @@ langchain-chroma>=0.1.0
 mistralai>=0.4.0
 
 chromadb>=0.5.0
-sentence-transformers>=3.0.0
-langchain-huggingface>=0.0.3
-huggingface-hub>=0.23.0
 tiktoken>=0.7.0
 
 streamlit>=1.35.0

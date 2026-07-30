@@ -71,26 +71,25 @@ project/
 1. Push this repo to GitHub (**never** commit `.env` or real API keys).
 2. Go to [share.streamlit.io](https://share.streamlit.io/) → **New app**.
 3. Select repo `Zaid-shaheen-777/Ai-Video-Assistant`, branch `main`, main file `app.py`.
-4. In **Advanced settings**, set **Python version to 3.11 or 3.12** (not 3.13/3.14 — Whisper/torch work more reliably there).
+4. In **Advanced settings**, prefer **Python 3.11 or 3.12**.
 5. Under **Secrets**, paste (TOML):
 
 ```toml
 MISTRAL_API_KEY = "your_mistral_key_here"
 GEMINI_API_KEY = "your_gemini_key_here"
-WHISPER_MODEL = "base"
 ```
 
 6. Click **Deploy**. FFmpeg is installed via `packages.txt`.
 
-If the app was already created on Python 3.14: open **Manage app → Settings → Python version → 3.11 or 3.12**, then reboot/redeploy.
+Cloud uses **Gemini** for transcription and **Mistral** for summary/chat/embeddings (no heavy torch/Whisper install).
+
+If install fails after a change: **Manage app → Reboot app**. If Python is stuck on 3.14, recreate the app and pick 3.11/3.12.
 
 **Safety checklist**
 - API keys live only in Streamlit Secrets (or local `.env`) — not in git.
-- Use `WHISPER_MODEL = "tiny"` or `"base"` on the free Cloud tier (less RAM).
-- Whisper + PyTorch are heavy; if the app runs out of memory, switch language to **hinglish** (Gemini API) or set `WHISPER_MODEL = "tiny"`.
+- Local Whisper is optional: `pip install -r requirements-local.txt` then set `USE_WHISPER=1`.
 
 ## ⚠️ Notes
 
-- First run downloads the Whisper model — this may take a minute.
 - Long meetings take longer to transcribe and summarize.
 - Vector data is stored locally in a `vector_db/` folder.

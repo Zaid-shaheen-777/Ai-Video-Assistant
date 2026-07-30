@@ -1,50 +1,46 @@
 """
 transcriber.py
 --------------
-This file turns audio chunks into text (transcription).
+Turns audio chunks into text (transcription).
 
-We support two "engines":
-1. Whisper (runs on your own computer) -> used for English audio
-2. Gemini (Google's AI, via API) -> used for Hinglish audio
-   (Hinglish = Hindi + English mixed speech)
-
-Beginner note: think of this file as a translator between
-"audio file" and "text".
+Default engine: Gemini API (works on Streamlit Cloud — no local GPU/torch).
+Optional engine: Whisper, if installed locally and USE_WHISPER=1.
 """
 
 import os
 import re
-import tempfile
 from pathlib import Path
 from shutil import copy2
 
 from dotenv import load_dotenv
-import whisper
 from google import genai
 
-load_dotenv()  # loads variables from your .env file (like API keys)
+load_dotenv()
 
-# -----------------------------------------------------------
-# SETTINGS
-# -----------------------------------------------------------
-
-# Which size of Whisper model to use. Options: tiny, base, small, medium, large
-# Bigger = more accurate but slower. "small" is a good balance for beginners.
-# Default "base" is Cloud-friendly; use "small" locally via .env if you want.
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
-
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-# Set up the Gemini client only if we have an API key
 gemini_client = None
 if GEMINI_API_KEY:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    print("Warning: No GEMINI_API_KEY found. Hinglish transcription won't work.")
+    print("Warning: No GEMINI_API_KEY found. Transcription won't work.")
 
-# We only want to load the Whisper model once (it's slow to load),
-# so we keep it in this variable and reuse it.
 _whisper_model = None
+_whisper_module = None
+
+
+def _try_import_whisper():
+    """Import openai-whisper only if installed (optional local dependency)."""
+    global _whisper_module
+    if _whisper_module is not None:
+        return _whisper_module
+    try:
+        import whisper as whisper_mod
+        _whisper_module = whisper_mod
+        return _whisper_module
+    except ImportError:
+        return None
 
 
 def prepare_upload_path(chunk_path: str) -> str:
@@ -70,27 +66,33 @@ def prepare_upload_path(chunk_path: str) -> str:
 def load_whisper_model():
     """Load the Whisper model into memory (only once)."""
     global _whisper_model
+    whisper_mod = _try_import_whisper()
+    if whisper_mod is None:
+        raise ImportError(
+            "openai-whisper is not installed. "
+            "Use Gemini (default) or pip install -r requirements-local.txt"
+        )
 
     if _whisper_model is None:
         print(f"Loading Whisper model: {WHISPER_MODEL_NAME} ...")
-        _whisper_model = whisper.load_model(WHISPER_MODEL_NAME)
+        _whisper_model = whisper_mod.load_model(WHISPER_MODEL_NAME)
         print("Whisper model loaded.")
 
     return _whisper_model
 
 
 def transcribe_with_whisper(chunk_path: str) -> str:
-    """Transcribe one audio chunk using Whisper (good for English)."""
+    """Transcribe one audio chunk using Whisper (local, English)."""
     model = load_whisper_model()
     result = model.transcribe(chunk_path, task="transcribe")
     return result["text"]
 
 
 def transcribe_with_gemini(chunk_path: str) -> str:
-    """Transcribe one audio chunk using Gemini (good for Hinglish)."""
+    """Transcribe one audio chunk using Gemini (Cloud-friendly)."""
     if gemini_client is None:
         raise ValueError(
-            "Gemini API key is missing. Set GEMINI_API_KEY in your .env file."
+            "Gemini API key is missing. Set GEMINI_API_KEY in Secrets or .env."
         )
 
     upload_path = prepare_upload_path(chunk_path)
@@ -114,33 +116,33 @@ Rules:
     return response.text.strip()
 
 
-def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
-    """
-    Pick the right engine based on the chosen language,
-    and transcribe a single audio chunk.
-    """
+def _should_use_whisper(language: str) -> bool:
+    """Whisper only when explicitly enabled and available (local)."""
     if language.lower() == "hinglish":
-        return transcribe_with_gemini(chunk_path)
-    else:
+        return False
+    flag = os.getenv("USE_WHISPER", "0").strip().lower()
+    if flag not in ("1", "true", "yes"):
+        return False
+    return _try_import_whisper() is not None
+
+
+def transcribe_chunk(chunk_path: str, language: str = "english") -> str:
+    """Pick the engine and transcribe a single audio chunk."""
+    if _should_use_whisper(language):
         return transcribe_with_whisper(chunk_path)
+    return transcribe_with_gemini(chunk_path)
 
 
 def transcribe_all(chunks: list, language: str = "english") -> str:
-    """
-    Transcribe a list of audio chunks and join them into one
-    full transcript (a single string).
-    """
-    engine_name = "Gemini" if language.lower() == "hinglish" else "Whisper"
+    """Transcribe all chunks and join into one transcript string."""
+    engine_name = "Whisper" if _should_use_whisper(language) else "Gemini"
     print(f"Transcribing using {engine_name}...")
 
     all_text_pieces = []
-
     for index, chunk_path in enumerate(chunks):
         print(f"Transcribing chunk {index + 1} of {len(chunks)}...")
-        text = transcribe_chunk(chunk_path, language)
-        all_text_pieces.append(text)
+        all_text_pieces.append(transcribe_chunk(chunk_path, language))
 
     full_transcript = " ".join(all_text_pieces).strip()
     print("Transcription complete.")
-
     return full_transcript
