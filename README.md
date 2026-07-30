@@ -71,7 +71,8 @@ project/
 1. Push this repo to GitHub (**never** commit `.env` or real API keys).
 2. Go to [share.streamlit.io](https://share.streamlit.io/) → **New app**.
 3. Select repo `Zaid-shaheen-777/Ai-Video-Assistant`, branch `main`, main file `app.py`.
-4. Under **Advanced settings → Secrets**, paste (TOML):
+4. In **Advanced settings**, set **Python version to 3.11 or 3.12** (not 3.13/3.14 — Whisper/torch work more reliably there).
+5. Under **Secrets**, paste (TOML):
 
 ```toml
 MISTRAL_API_KEY = "your_mistral_key_here"
@@ -79,7 +80,9 @@ GEMINI_API_KEY = "your_gemini_key_here"
 WHISPER_MODEL = "base"
 ```
 
-5. Click **Deploy**. FFmpeg is installed via `packages.txt`.
+6. Click **Deploy**. FFmpeg is installed via `packages.txt`.
+
+If the app was already created on Python 3.14: open **Manage app → Settings → Python version → 3.11 or 3.12**, then reboot/redeploy.
 
 **Safety checklist**
 - API keys live only in Streamlit Secrets (or local `.env`) — not in git.
