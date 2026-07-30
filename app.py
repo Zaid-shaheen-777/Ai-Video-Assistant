@@ -27,30 +27,43 @@ from datetime import datetime
 import streamlit as st
 from dotenv import load_dotenv
 
-# Load local .env first (dev). On Streamlit Cloud, secrets are injected next.
+# Local development: load .env (ignored on Streamlit Cloud — use Secrets there)
 load_dotenv()
 
-# Streamlit Cloud: map Secrets → environment so the rest of the app
-# can keep using os.getenv(...) without ever committing API keys.
-_SECRET_KEYS = (
-    "MISTRAL_API_KEY",
-    "GEMINI_API_KEY",
-    "GOOGLE_API_KEY",
-    "WHISPER_MODEL",
-)
-try:
-    for _key in _SECRET_KEYS:
-        if _key in st.secrets and st.secrets[_key]:
-            os.environ[_key] = str(st.secrets[_key])
-except Exception:
-    # No secrets.toml / not on Streamlit Cloud — local .env is enough
-    pass
+
+def _apply_streamlit_secrets() -> None:
+    """Copy Streamlit Secrets into os.environ for the rest of the app."""
+    try:
+        secret_map = dict(st.secrets)
+    except Exception:
+        return
+
+    wanted = (
+        "MISTRAL_API_KEY",
+        "GEMINI_API_KEY",
+        "GOOGLE_API_KEY",
+        "WHISPER_MODEL",
+        "USE_WHISPER",
+    )
+    for key in wanted:
+        if key not in secret_map:
+            continue
+        value = secret_map[key]
+        if value is None:
+            continue
+        text = str(value).strip().strip('"').strip("'")
+        if text:
+            os.environ[key] = text
+
+
+_apply_streamlit_secrets()
 
 from utils.audio_processor import process_input, YouTubeDownloadError
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
 from core.rag_engine import build_rag_chain, ask_question
+
 
 
 # =============================================================
@@ -280,6 +293,22 @@ st.markdown(
 
 with st.sidebar:
     st.markdown("### 1️⃣ Provide your meeting")
+
+    # Helpful Cloud hint if keys are missing
+    _has_gemini = bool(os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY"))
+    _has_mistral = bool(os.getenv("MISTRAL_API_KEY"))
+    if not _has_gemini or not _has_mistral:
+        missing = []
+        if not _has_gemini:
+            missing.append("GEMINI_API_KEY")
+        if not _has_mistral:
+            missing.append("MISTRAL_API_KEY")
+        st.warning(
+            "Missing secrets: "
+            + ", ".join(missing)
+            + ". Set them in Manage app → Settings → Secrets (TOML). "
+            + "Cloud does **not** read your local `.env` file."
+        )
 
     input_type = st.radio("Choose input type:", ["YouTube URL", "Upload a file"], label_visibility="collapsed")
 

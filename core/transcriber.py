@@ -18,16 +18,31 @@ from google import genai
 load_dotenv()
 
 WHISPER_MODEL_NAME = os.getenv("WHISPER_MODEL", "base")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-
-gemini_client = None
-if GEMINI_API_KEY:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-else:
-    print("Warning: No GEMINI_API_KEY found. Transcription won't work.")
 
 _whisper_model = None
 _whisper_module = None
+_gemini_client = None
+
+
+def _get_gemini_api_key() -> str | None:
+    """Read the key at call time (after Streamlit Secrets are applied)."""
+    key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not key:
+        return None
+    return key.strip().strip('"').strip("'") or None
+
+
+def get_gemini_client():
+    """Create / reuse the Gemini client using the current env key."""
+    global _gemini_client
+    api_key = _get_gemini_api_key()
+    if not api_key:
+        return None
+    # Recreate if key changed (e.g. secrets updated + reboot)
+    if _gemini_client is None or getattr(_gemini_client, "_api_key", None) != api_key:
+        _gemini_client = genai.Client(api_key=api_key)
+        _gemini_client._api_key = api_key
+    return _gemini_client
 
 
 def _try_import_whisper():
@@ -90,9 +105,14 @@ def transcribe_with_whisper(chunk_path: str) -> str:
 
 def transcribe_with_gemini(chunk_path: str) -> str:
     """Transcribe one audio chunk using Gemini (Cloud-friendly)."""
+    gemini_client = get_gemini_client()
     if gemini_client is None:
         raise ValueError(
-            "Gemini API key is missing. Set GEMINI_API_KEY in Secrets or .env."
+            "Gemini API key is missing. In Streamlit Cloud go to "
+            "Manage app → Settings → Secrets and paste TOML like:\n"
+            'GEMINI_API_KEY = "your_key_here"\n'
+            'MISTRAL_API_KEY = "your_key_here"\n'
+            "(A .env file is only used when running locally — Cloud ignores it.)"
         )
 
     upload_path = prepare_upload_path(chunk_path)
