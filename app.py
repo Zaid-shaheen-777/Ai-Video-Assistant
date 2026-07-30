@@ -46,7 +46,7 @@ except Exception:
     # No secrets.toml / not on Streamlit Cloud — local .env is enough
     pass
 
-from utils.audio_processor import process_input
+from utils.audio_processor import process_input, YouTubeDownloadError
 from core.transcriber import transcribe_all
 from core.summarizer import summarize, generate_title
 from core.extractor import extract_action_items, extract_key_decisions, extract_questions
@@ -287,6 +287,7 @@ with st.sidebar:
 
     if input_type == "YouTube URL":
         youtube_url = st.text_input("YouTube URL", placeholder="https://www.youtube.com/watch?v=...")
+        st.caption("Note: YouTube downloads often fail on Streamlit Cloud. Prefer **Upload a file** there.")
         if youtube_url:
             source = youtube_url
 
@@ -326,36 +327,47 @@ if run_button:
     if not source:
         st.warning("Please provide a YouTube URL or upload a file first.")
     else:
-        with st.status("Processing your meeting...", expanded=True) as status:
-            st.write("🔊 Step 1/4 — Preparing audio...")
-            chunks = process_input(source)
+        try:
+            with st.status("Processing your meeting...", expanded=True) as status:
+                st.write("🔊 Step 1/4 — Preparing audio...")
+                chunks = process_input(source)
 
-            st.write("📝 Step 2/4 — Transcribing audio (this can take a while)...")
-            transcript = transcribe_all(chunks, language)
+                st.write("📝 Step 2/4 — Transcribing audio (this can take a while)...")
+                transcript = transcribe_all(chunks, language)
 
-            st.write("🧠 Step 3/4 — Generating title, summary, and highlights...")
-            title = generate_title(transcript)
-            summary = summarize(transcript)
-            action_items = extract_action_items(transcript)
-            decisions = extract_key_decisions(transcript)
-            questions = extract_questions(transcript)
+                st.write("🧠 Step 3/4 — Generating title, summary, and highlights...")
+                title = generate_title(transcript)
+                summary = summarize(transcript)
+                action_items = extract_action_items(transcript)
+                decisions = extract_key_decisions(transcript)
+                questions = extract_questions(transcript)
 
-            st.write("🔎 Step 4/4 — Setting up Q&A engine...")
-            rag_chain = build_rag_chain(transcript)
+                st.write("🔎 Step 4/4 — Setting up Q&A engine...")
+                rag_chain = build_rag_chain(transcript)
 
-            status.update(label="✨ Done!", state="complete", expanded=False)
+                status.update(label="✨ Done!", state="complete", expanded=False)
 
-        # Save everything so it survives future reruns (e.g. when chatting)
-        st.session_state.result = {
-            "title": title,
-            "transcript": transcript,
-            "summary": summary,
-            "action_items": action_items,
-            "key_decisions": decisions,
-            "open_questions": questions,
-            "rag_chain": rag_chain,
-        }
-        st.session_state.chat_history = []  # reset chat for the new meeting
+            # Save everything so it survives future reruns (e.g. when chatting)
+            st.session_state.result = {
+                "title": title,
+                "transcript": transcript,
+                "summary": summary,
+                "action_items": action_items,
+                "key_decisions": decisions,
+                "open_questions": questions,
+                "rag_chain": rag_chain,
+            }
+            st.session_state.chat_history = []  # reset chat for the new meeting
+            st.rerun()
+
+        except YouTubeDownloadError as err:
+            st.error(str(err))
+            st.info(
+                "Tip: On Streamlit Cloud, **Upload a file** is the most reliable option. "
+                "Download the YouTube video on your PC (or export audio), then upload mp3/mp4/m4a/wav."
+            )
+        except Exception as err:
+            st.error(f"Something went wrong while processing: {err}")
 
 
 # =============================================================

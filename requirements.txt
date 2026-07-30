@@ -1,7 +1,7 @@
 # Streamlit Community Cloud — keep this light (no torch / Whisper).
 # Local Whisper is optional; see requirements-local.txt
 
-yt-dlp>=2024.4.9
+yt-dlp>=2025.1.26
 pydub>=0.25.1
 audioop-lts>=0.2.1; python_version >= "3.13"
 ffmpeg-python>=0.2.0
